@@ -1,9 +1,9 @@
 package org.challenge.core;
 
-import jersey.repackaged.com.google.common.collect.Maps;
 import jersey.repackaged.com.google.common.collect.Sets;
 import org.challenge.core.adapaters.RestServiceAdapter;
 import org.challenge.core.adapaters.RestServiceAdapterImpl;
+import org.challenge.core.metrics.MetricManager;
 import org.challenge.ws.resource.Item;
 import org.challenge.ws.resource.Option;
 import org.challenge.ws.resource.Order;
@@ -16,11 +16,6 @@ public class Faire implements IFaire {
     private static Faire INSTANCE = null;
 
     private Map<String, Product> mapProducts = null;
-
-    private Map<String, Integer> mapStateCount = new HashMap<>();
-    private Map<Option, Integer> mapProductOptionSellingCount = new HashMap<>();
-    private String largestOrder;
-    private Long largestOrderAmount;
 
     public static Faire getInstance() {
         if (INSTANCE == null) {
@@ -36,48 +31,14 @@ public class Faire implements IFaire {
     @Override
     public void execute(String apiKey, String idBrand) {
         mapProducts = getRestServiceAdapter().getMapProducts(apiKey, idBrand);
+        MetricManager.getInstance().compute(mapProducts);
         Collection<Order> orders = getRestServiceAdapter().getOrders(apiKey);
         orders.forEach(order -> processOrder(order));
-        printTopStateOrder();
-        printTopProductOptionSelling();
-        printLargestOrderAndAmount();
-    }
-
-    private void printLargestOrderAndAmount() {
-        System.out.println(String.format("The largest order by dollar amount: %s", largestOrder));
-        System.out.println(String.format("The largest order amount by dollar amount: %d", largestOrderAmount));
-    }
-
-    private void printTopProductOptionSelling() {
-        String option = null;
-        Integer max = -1;
-        Iterator<Map.Entry<Option, Integer>> it = getMapProductOptionSellingCount().entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<Option, Integer> entry = it.next();
-            if (entry.getValue() > max) {
-                max = entry.getValue();
-                option = entry.getKey().getId();
-            }
-
-        }
-        System.out.println(String.format("The best selling product option: %s", option));
-    }
-
-    private void printTopStateOrder() {
-        String topState = null;
-        Integer max = -1;
-        Iterator<Map.Entry<String, Integer>> it = getMapStateCount().entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<String, Integer> entry = it.next();
-            if (entry.getValue() > max) {
-                max = entry.getValue();
-                topState = entry.getKey();
-            }
-        }
-        System.out.println(String.format("The state with the most orders: %s", topState));
+        MetricManager.getInstance().printMetrics();
     }
 
     private void processOrder(Order order) {
+        MetricManager.getInstance().compute(order);
         if (!isOrderAccepted(order)) {
             if (isOrderFulfilled(order)) {
                 acceptOrder(order);
@@ -85,15 +46,6 @@ public class Faire implements IFaire {
             } else {
                 backorderingItems(order.getItems());
             }
-        }
-        countStates(order.getAddress().getState());
-    }
-
-    private void countStates(String stateName) {
-        if (getMapStateCount().containsKey(stateName)) {
-            getMapStateCount().put(stateName, getMapStateCount().get(stateName) + Integer.valueOf(1));
-        } else {
-            getMapStateCount().put(stateName, Integer.valueOf(1));
         }
     }
 
@@ -117,7 +69,7 @@ public class Faire implements IFaire {
 
     private void updateInventoryLevels(List<Item> items) {
         Set<Option> optionsToUpdate = Sets.newHashSet();
-        long sellingAmount = 0;
+        //long sellingAmount = 0;
         for (Item item : items) {
             if (getMapProducts().containsKey(item.getProduct_id())) {
                 Product product = getMapProducts().get(item.getProduct_id());
@@ -127,27 +79,16 @@ public class Faire implements IFaire {
                         if (option.getAvailable_quantity() != null && qnt >= product.getUnit_multiplier() && qnt <= option.getAvailable_quantity()) {
                             option.setAvailable_quantity(option.getAvailable_quantity() - qnt);
                             optionsToUpdate.add(option);
-                            countOption(option);
-                            sellingAmount += product.getWholesale_price_cents() * qnt;
+                            //MetricManager.getInstance().computeOption(option, qnt);
+          //                  sellingAmount = item.getPrice_cents() * qnt;
                         }
                     }
                 }
             }
         }
-        if (sellingAmount > largestOrderAmount) {
-            largestOrderAmount = sellingAmount;
-            largestOrder = items.iterator().next().getOrder_id();
-        }
+        //MetricManager.getInstance().computeLargestOrderMetrics(items.iterator().next().getOrder_id(), sellingAmount);
         if (!optionsToUpdate.isEmpty()) {
             getRestServiceAdapter().updateInventoryLevel(optionsToUpdate);
-        }
-    }
-
-    private void countOption(Option option) {
-        if (getMapProductOptionSellingCount().containsKey(option)) {
-            getMapProductOptionSellingCount().put(option, getMapProductOptionSellingCount().get(option) + Integer.valueOf(1));
-        } else {
-            getMapProductOptionSellingCount().put(option, Integer.valueOf(1));
         }
     }
 
@@ -190,11 +131,4 @@ public class Faire implements IFaire {
         return mapProducts;
     }
 
-    public Map<String, Integer> getMapStateCount() {
-        return mapStateCount;
-    }
-
-    public Map<Option, Integer> getMapProductOptionSellingCount() {
-        return mapProductOptionSellingCount;
-    }
 }
