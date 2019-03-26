@@ -3,7 +3,6 @@ package org.challenge.core.metrics;
 import org.challenge.ws.resource.Item;
 import org.challenge.ws.resource.Option;
 import org.challenge.ws.resource.Order;
-import org.challenge.ws.resource.Product;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -12,13 +11,17 @@ import java.util.Map;
 
 public class MetricManager {
 
-    private Map<String, Product> mapProducts = null;
+    private Map<String, Option> mapProductOptions = null;
+
     private Map<String, Integer> mapStateCount = new HashMap<>();
     private Map<Option, Integer> mapProductOptionSellingCount = new HashMap<>();
     private String largestOrder;
     private long largestOrderAmount;
 
     private static MetricManager INSTANCE = null;
+    private String bestSellingProductOption = null;
+    private long totalAmount = 0;
+    private int orderCount = 0;
 
     private MetricManager() {
         super();
@@ -31,19 +34,17 @@ public class MetricManager {
         return INSTANCE;
     }
 
-    public String calculateBestSellingProductOption() {
-        String option = null;
+    public void calculateBestSellingProductOption() {
         Integer max = -1;
         Iterator<Map.Entry<Option, Integer>> it = getMapProductOptionSellingCount().entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<Option, Integer> entry = it.next();
-            if (entry.getValue() > max) {
-                max = entry.getValue();
-                option = entry.getKey().getId();
+            Integer value = entry.getValue();
+            if (value > max) {
+                max = value;
+                bestSellingProductOption = entry.getKey().getId();
             }
-
         }
-        return option;
     }
 
     public String calculateMortStateOrdersFrom() {
@@ -60,37 +61,34 @@ public class MetricManager {
         return topState;
     }
 
-    public void compute(Order order) {
+    public void computeMapProduto(Order order) {
         countStates(order.getAddress().getState());
         List<Item> items = order.getItems();
         long sellingAmount = 0;
         for (Item item : items) {
-            Product product = getMapProducts().get(item.getProduct_id());
-            for (Option option : product.getOptions()) {
-                if (option.getId().equalsIgnoreCase(item.getProduct_option_id())) {
-                    int qnt = item.getQuantity();
-                    computeOption(option, qnt);
-                    sellingAmount += item.getPrice_cents() * qnt;
-                }
-            }
+            Option option = getMapProductOptions().get(item.getProduct_option_id());
+            int qnt = item.getQuantity();
+            computeOption(option, qnt);
+            sellingAmount += item.getPrice_cents() * qnt;
         }
-        computeLargestOrderMetrics(items.iterator().next().getOrder_id(), sellingAmount);
+        computeOrderMetrics(items.iterator().next().getOrder_id(), sellingAmount);
+        totalAmount+=sellingAmount;
+        orderCount++;
     }
 
-    public void computeLargestOrderMetrics(String orderId, long sellingAmount){
+    private void computeOrderMetrics(String orderId, long sellingAmount) {
         if (sellingAmount > largestOrderAmount) {
             largestOrderAmount = sellingAmount;
             largestOrder = orderId;
         }
     }
 
-    public void computeOption(Option option, int qnt) {
+    private void computeOption(Option option, int qnt) {
         if (getMapProductOptionSellingCount().containsKey(option)) {
             getMapProductOptionSellingCount().put(option, getMapProductOptionSellingCount().get(option) + Integer.valueOf(qnt));
         } else {
             getMapProductOptionSellingCount().put(option, Integer.valueOf(qnt));
         }
-        getMapProductOptionSellingCount().get(option);
     }
 
     private void countStates(String stateName) {
@@ -105,6 +103,13 @@ public class MetricManager {
         printTopStateOrder();
         printTopProductOptionSelling();
         printLargestOrderAndAmount();
+        printAmountMetrics();
+    }
+
+    private void printAmountMetrics() {
+        System.out.println(String.format("The total amount: %d", totalAmount));
+        System.out.println(String.format("The average amount per order: %d", totalAmount/orderCount));
+        System.out.println(String.format("The total of order: %d", orderCount));
     }
 
     private void printLargestOrderAndAmount() {
@@ -113,7 +118,8 @@ public class MetricManager {
     }
 
     private void printTopProductOptionSelling() {
-        System.out.println(String.format("The best selling product option: %s", calculateBestSellingProductOption()));
+        calculateBestSellingProductOption();
+        System.out.println(String.format("The best selling product option: %s", bestSellingProductOption));
     }
 
     private void printTopStateOrder() {
@@ -121,19 +127,19 @@ public class MetricManager {
     }
 
 
-    public Map<String, Integer> getMapStateCount() {
+    private Map<String, Integer> getMapStateCount() {
         return mapStateCount;
     }
 
-    public Map<String, Product> getMapProducts() {
-        return mapProducts;
+    private Map<String, Option> getMapProductOptions() {
+        return mapProductOptions;
     }
 
-    public Map<Option, Integer> getMapProductOptionSellingCount() {
+    private Map<Option, Integer> getMapProductOptionSellingCount() {
         return mapProductOptionSellingCount;
     }
 
-    public void compute(Map<String, Product> mapProducts) {
-        this.mapProducts = mapProducts;
+    public void computeProductOptions(Map<String, Option> mapProductOptions) {
+        this.mapProductOptions = new HashMap<>(mapProductOptions);
     }
 }

@@ -11,9 +11,9 @@ public interface RestClient {
 
     Collection<Order> getAllOrders();
 
-    void acceptAnOrder(String idOrder);
+    void acceptAnOrder(Order order);
 
-    void updateInventoryLevels();
+    void updateInventoryLevels(String jsonStr);
 
-    void backorderingItems();
+    void backorderingItems(String idOrder, String jsonContent);
 }

@@ -1,6 +1,7 @@
 package org.challenge.core.adapaters;
 
-import org.challenge.ws.resource.Item;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import org.challenge.ws.resource.ItemBackorderingRequest;
 import org.challenge.ws.resource.Option;
 import org.challenge.ws.resource.Order;
 import org.challenge.ws.resource.Product;
@@ -15,9 +16,9 @@ public interface RestServiceAdapter {
 
     Collection<Order> getOrders(String apiKey);
 
-    boolean acceptOrder(String orderId);
+    boolean acceptOrder(Order order, String apiKey);
 
-    boolean updateInventoryLevel(Set<Option> optionsToUpdate);
+    boolean updateInventoryLevel(Set<Option> optionsToUpdate, String apiKey) throws JsonProcessingException;
 
-    boolean backorderingItems(Set<Item> items);
+    boolean backorderingItems(Set<ItemBackorderingRequest> optionsToBackorder, String apiKey) throws JsonProcessingException;
 }
